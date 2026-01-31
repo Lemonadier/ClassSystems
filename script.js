@@ -105,7 +105,8 @@ const app = {
         // Autofill API URL input from saved settings (cb_api_url or session-specific)
         const savedApi = localStorage.getItem('cb_api_url') || localStorage.getItem('cb_session_api_url');
         if (savedApi) {
-            CONFIG.apiUrl = savedApi;
+            // persist session API to permanent storage if not already saved
+            if(!localStorage.getItem('cb_api_url')) localStorage.setItem('cb_api_url', savedApi);
             const apiInput = document.getElementById('api-url');
             if(apiInput) apiInput.value = savedApi;
         }
@@ -703,9 +704,10 @@ const app = {
                 filter.appendChild(opt);
             });
         }
-        // Populate checkbox list inside the Select Students dropdown
+        // Populate checkbox list inside the Select Students dropdown (refresh every data load)
         const list = document.getElementById('chart-student-list');
-        if(list && list.children.length === 0) {
+        if(list) {
+            list.innerHTML = '';
             state.students.sort((a,b)=> (a.No||0)-(b.No||0)).forEach(s => {
                 const id = s['Student ID'];
                 const wrap = document.createElement('label');
@@ -738,6 +740,8 @@ const app = {
         let displayStudents = state.students;
         if(checkedIds.length > 0) displayStudents = state.students.filter(s => checkedIds.includes(s['Student ID']));
         else if(studentFilter) displayStudents = state.students.filter(s => s['Student ID'] === studentFilter);
+        // if selection mismatch results in empty list, fallback to all students
+        if(!displayStudents || displayStudents.length === 0) displayStudents = state.students;
 
         // attendanceMap[studentId][dateKey] = status
         const attendanceMap = {};
@@ -880,7 +884,15 @@ const app = {
              app.loading(false);
              if(d.status === 'success') { 
                  localStorage.setItem('cb_session_token', key);
-                 localStorage.setItem('cb_session_api_url', CONFIG.apiUrl);
+                 // persist the API URL permanently when teacher logs in
+                 const apiInputVal = document.getElementById('api-url')?.value?.trim();
+                 if(apiInputVal) {
+                     localStorage.setItem('cb_api_url', apiInputVal);
+                     localStorage.setItem('cb_session_api_url', apiInputVal);
+                 } else {
+                     const existing = localStorage.getItem('cb_api_url') || localStorage.getItem('cb_session_api_url') || CONFIG.apiUrl || '';
+                     if(existing) { localStorage.setItem('cb_api_url', existing); localStorage.setItem('cb_session_api_url', existing); }
+                 }
                  localStorage.setItem('cb_session_expiry', Date.now() + CONFIG.sessionTimeout);
                  CONFIG.role = 'teacher';
                  app.showLauncher();
