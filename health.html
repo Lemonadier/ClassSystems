@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Health (BMI) - ClassMainframe</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-rose-50 h-[100dvh] flex flex-col text-slate-800 font-sans">
+    <div id="root-container"></div>
+    <script>
+        fetch('index.html').then(r => r.text()).then(html => {
+            document.body.innerHTML = new DOMParser().parseFromString(html, 'text/html').body.innerHTML;
+            const script = document.createElement('script');
+            script.src = 'script.js';
+            script.onload = () => {
+                const originalInit = app.init;
+                app.init = function() {
+                    originalInit.apply(this);
+                    const interval = setInterval(() => {
+                        if (CONFIG.role) { app.enterSystem('health'); clearInterval(interval); }
+                        else document.querySelector('.text-3xl').textContent = "Health System";
+                    }, 500);
+                };
+                app.init();
+            };
+            document.body.appendChild(script);
+        });
+    </script>
+</body>
+</html>

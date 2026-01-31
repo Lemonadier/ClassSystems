@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance - ClassMainframe</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-emerald-50 h-[100dvh] flex flex-col text-slate-800 font-sans">
+    <!-- Duplicate index.html structure but force attendance system -->
+    <!-- For simplicity, this page just loads the main app and auto-switches -->
+    <div id="root-container"></div>
+    
+    <!-- Load Main App Scripts -->
+    <script>
+        // Copy content from index.html dynamically or redirect
+        // Ideally, we load the same script.js and just init differently.
+        fetch('index.html')
+            .then(response => response.text())
+            .then(html => {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                document.body.innerHTML = doc.body.innerHTML;
+                
+                // Inject custom init
+                const script = document.createElement('script');
+                script.src = 'script.js';
+                script.onload = () => {
+                    // Override default init to force Attendance
+                    const originalInit = app.init;
+                    app.init = function() {
+                        originalInit.apply(this);
+                        // Force switch after login check
+                        const interval = setInterval(() => {
+                            if (CONFIG.role) {
+                                app.enterSystem('attendance');
+                                clearInterval(interval);
+                            } else {
+                                // If not logged in, show auth but hint attendance
+                                document.querySelector('.text-3xl').textContent = "Attendance Check";
+                            }
+                        }, 500);
+                    };
+                    app.init();
+                };
+                document.body.appendChild(script);
+            });
+    </script>
+</body>
+</html>
