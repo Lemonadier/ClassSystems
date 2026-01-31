@@ -27,7 +27,7 @@ const SYSTEMS = {
 
 const i18n = {
     en: {
-        app_name: "ClassMainframe", app_subtitle: "Integrated Management", api_not_connected: "API Not Connected",
+        app_name: "Banyuak System", app_subtitle: "Integrated Management", api_not_connected: "API Not Connected",
         role_student: "Student / Parent", role_teacher: "Teacher",
         label_student_id: "Student ID", btn_view_wallet: "Enter System",
         label_access_pin: "Admin Key", btn_enter_dashboard: "Login", btn_setup: "Setup",
@@ -43,7 +43,7 @@ const i18n = {
         label_weight: "Weight (kg)", label_height: "Height (cm)", label_mood: "Mood", label_intel: "Intel Score"
     },
     th: {
-        app_name: "ClassMainframe", app_subtitle: "ระบบบริหารจัดการรวม", api_not_connected: "ยังไม่เชื่อมต่อ API",
+        app_name: "Banyuak System", app_subtitle: "ระบบบริหารจัดการรวม", api_not_connected: "ยังไม่เชื่อมต่อ API",
         role_student: "นักเรียน / ผู้ปกครอง", role_teacher: "ครูผู้สอน",
         label_student_id: "รหัสนักเรียน", btn_view_wallet: "เข้าสู่ระบบ",
         label_access_pin: "รหัส Admin", btn_enter_dashboard: "เข้าสู่ระบบ", btn_setup: "ตั้งค่า",
