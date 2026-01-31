@@ -101,6 +101,14 @@ const app = {
         bind('form-add-student', app.handleAddStudent);
         
         document.getElementById('search-input').oninput = (e) => app.renderTable(e.target.value);
+
+        // Autofill API URL input from saved settings (cb_api_url or session-specific)
+        const savedApi = localStorage.getItem('cb_api_url') || localStorage.getItem('cb_session_api_url');
+        if (savedApi) {
+            CONFIG.apiUrl = savedApi;
+            const apiInput = document.getElementById('api-url');
+            if(apiInput) apiInput.value = savedApi;
+        }
     },
 
     setLang: (lang) => {
