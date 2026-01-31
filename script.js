@@ -669,24 +669,38 @@ const app = {
             }
         });
 
-        // Determine week starts (Monday) between range
-        const start = dateFrom ? new Date(dateFrom) : (function(){ const d=new Date(); d.setDate(d.getDate()-7); return d; })();
-        const end = dateTo ? new Date(dateTo) : new Date();
+        // Determine week starts (Monday) between range and include full 7-day weeks (Mon-Sun)
+        const startElem = document.getElementById('analytics-date-from');
+        const endElem = document.getElementById('analytics-date-to');
 
+        // If user provided dates use them, otherwise default to current week's Monday-Sunday
+        const today = new Date();
         function getMonday(d){ const dt=new Date(d); const day = dt.getDay(); const diff = (day === 0 ? -6 : 1 - day); dt.setDate(dt.getDate() + diff); dt.setHours(0,0,0,0); return dt; }
+        function getSunday(d){ const dt=new Date(d); const day = dt.getDay(); const diff = (day === 0 ? 0 : 7 - day); dt.setDate(dt.getDate() + diff); dt.setHours(0,0,0,0); return dt; }
+
+        let start = dateFrom ? new Date(dateFrom) : getMonday(today);
+        let end = dateTo ? new Date(dateTo) : getSunday(today);
+
+        // Normalize times
+        start.setHours(0,0,0,0); end.setHours(0,0,0,0);
+
+        // If inputs exist, set their values to the chosen defaults (so UI shows current week)
+        if(startElem && !startElem.value) startElem.value = start.toISOString().split('T')[0];
+        if(endElem && !endElem.value) endElem.value = end.toISOString().split('T')[0];
 
         const weeks = [];
         let cur = getMonday(start);
-        while(cur <= end) {
+        const last = getMonday(end);
+        while(cur <= last) {
             weeks.push(new Date(cur));
             cur = new Date(cur); cur.setDate(cur.getDate() + 7);
         }
 
         let html = '';
-        // For each week render a table: columns Mon-Fri
+        // For each week render a table: columns Mon-Sun (7 days)
         weeks.forEach(weekStart => {
             const cols = [];
-            for(let i=0;i<5;i++){ const d = new Date(weekStart); d.setDate(d.getDate() + i); cols.push(d); }
+            for(let i=0;i<7;i++){ const d = new Date(weekStart); d.setDate(d.getDate() + i); cols.push(d); }
 
             html += `<div class="mb-6 bg-white p-4 rounded-xl shadow-sm overflow-x-auto">`;
             html += `<div class="mb-2 font-semibold text-slate-600">Week: ${weekStart.toLocaleDateString()}</div>`;

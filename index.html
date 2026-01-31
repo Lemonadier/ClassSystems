@@ -187,6 +187,11 @@
                                 <div id="chart-student-list" class="space-y-1 mt-1"></div>
                             </div>
                         </div>
+                        <div class="flex items-center gap-2 mt-2 md:mt-0">
+                            <input type="date" id="analytics-date-from" class="px-3 py-2 rounded-lg border border-slate-200 text-sm" placeholder="From">
+                            <input type="date" id="analytics-date-to" class="px-3 py-2 rounded-lg border border-slate-200 text-sm" placeholder="To">
+                            <button onclick="app.renderWeeklyAttendance()" class="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold">Apply</button>
+                        </div>
                     </div>
                     <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-96 relative">
                         <canvas id="balanceChart" style="display: none;"></canvas>
