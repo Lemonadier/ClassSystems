@@ -237,7 +237,10 @@
     <!-- SETTINGS MODAL -->
     <div id="modal-settings" class="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm hidden items-center justify-center p-4">
         <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl transform transition-all max-h-[90vh] overflow-y-auto">
-            <h3 class="text-lg font-bold mb-4 flex items-center gap-2"><i class="fa-solid fa-sliders"></i> <span data-i18n="modal_settings_title">App Settings</span></h3>
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold flex items-center gap-2"><i class="fa-solid fa-sliders"></i> <span data-i18n="modal_settings_title">App Settings</span></h3>
+                <div class="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-1 rounded-lg" id="version-badge">v1.0</div>
+            </div>
             
             <div class="flex border-b border-slate-100 mb-4">
                 <button onclick="switchSettingTab('connection')" id="set-tab-connection" class="flex-1 pb-2 border-b-2 border-indigo-600 text-indigo-600 font-bold text-sm" data-i18n="tab_connection">Connection</button>
@@ -337,6 +340,11 @@
         </div>
     </div>
 
+    <script src="systems/core.js"></script>
+    <script src="systems/bank.js"></script>
+    <script src="systems/attendance.js"></script>
+    <script src="systems/health.js"></script>
+    <script src="systems/profile.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

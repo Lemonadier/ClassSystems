@@ -64,7 +64,7 @@ const CONFIG = {
     get apiUrl() { return localStorage.getItem('cb_api_url') || ''; },
     get adminKey() { return localStorage.getItem('cb_session_token') || ''; },
     get lang() { return localStorage.getItem('cb_lang') || 'en'; },
-    role: null, user: null, activeSystem: null, sessionTimeout: 20 * 60 * 1000
+    role: null, user: null, activeSystem: null, sessionTimeout: 20 * 60 * 1000, version: 'v1.0'
 };
 
 const state = { students: [], transactions: [], tableMode: 'students', isFetching: false, chartType: 'bar' };
@@ -73,6 +73,8 @@ const app = {
     init: () => {
         app.setLang(CONFIG.lang);
         const urlParams = new URLSearchParams(window.location.search);
+        
+        // Handle config parameter
         if(urlParams.get('config')) {
              try { localStorage.setItem('cb_api_url', atob(urlParams.get('config'))); window.history.replaceState({}, document.title, window.location.pathname); } catch(e){}
         }
@@ -80,7 +82,6 @@ const app = {
         const expiry = parseInt(localStorage.getItem('cb_session_expiry') || '0');
         
         // Check for magic link (parent auto-login)
-        const urlParams = new URLSearchParams(window.location.search);
         if(urlParams.get('role') === 'parent' && urlParams.get('childId')) {
             const childId = urlParams.get('childId');
             const apiUrlEncoded = urlParams.get('apiUrl');
@@ -131,7 +132,7 @@ const app = {
             document.getElementById('login-student-id').value = childId;
             // auto-submit student login form
             setTimeout(() => {
-                document.getElementById('form-login-student').dispatchEvent(new Event('submit'));
+                app.handleStudentLogin({ preventDefault: () => {} });
                 localStorage.removeItem('cb_magic_child_id');
             }, 300);
         }
@@ -224,80 +225,7 @@ const app = {
         const c = document.getElementById('dynamic-actions');
         if (!c) return;
         const lang = i18n[CONFIG.lang];
-        const sys = SYSTEMS[CONFIG.activeSystem];
-        let html = '';
-        
-        // System-specific actions
-        if (CONFIG.activeSystem === 'bank') {
-            html = `
-                <button onclick="openModal('transaction')" class="p-4 rounded-xl border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50 transition-all group text-left">
-                    <div class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center mb-3 group-hover:bg-indigo-600 group-hover:text-white transition-colors"><i class="fa-solid fa-money-bill-transfer"></i></div>
-                    <div class="font-semibold text-slate-700 text-sm">${lang.btn_new_tx}</div>
-                </button>
-            `;
-            if (CONFIG.role === 'teacher') {
-                html += `
-                    <button onclick="openModal('add-student')" class="p-4 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 transition-all group text-left">
-                        <div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-3 group-hover:bg-emerald-600 group-hover:text-white transition-colors"><i class="fa-solid fa-user-plus"></i></div>
-                        <div class="font-semibold text-slate-700 text-sm">${lang.btn_add_student}</div>
-                    </button>
-                    <button onclick="openModal('batch-student')" class="p-4 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50 transition-all group text-left">
-                        <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mb-3 group-hover:bg-blue-600 group-hover:text-white transition-colors"><i class="fa-solid fa-users"></i></div>
-                        <div class="font-semibold text-slate-700 text-sm">${lang.btn_batch_add}</div>
-                    </button>
-                    <button onclick="openModal('multi-tx')" class="p-4 rounded-xl border border-slate-200 hover:border-purple-500 hover:bg-purple-50 transition-all group text-left">
-                        <div class="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center mb-3 group-hover:bg-purple-600 group-hover:text-white transition-colors"><i class="fa-solid fa-layer-group"></i></div>
-                        <div class="font-semibold text-slate-700 text-sm">${lang.btn_batch_tx}</div>
-                    </button>
-                `;
-            }
-        } else if (CONFIG.activeSystem === 'attendance') {
-            if (CONFIG.role === 'teacher') {
-                html = `
-                    <button onclick="openModal('transaction')" class="p-4 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 transition-all group text-left">
-                        <div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-3 group-hover:bg-emerald-600 group-hover:text-white transition-colors"><i class="fa-solid fa-check-circle"></i></div>
-                        <div class="font-semibold text-slate-700 text-sm">${lang.btn_new_tx}</div>
-                    </button>
-                    <button onclick="openModal('multi-tx')" class="p-4 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 transition-all group text-left">
-                        <div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-3 group-hover:bg-emerald-600 group-hover:text-white transition-colors"><i class="fa-solid fa-users-check"></i></div>
-                        <div class="font-semibold text-slate-700 text-sm">${lang.btn_batch_tx}</div>
-                    </button>
-                `;
-            } else if (CONFIG.role === 'parent') {
-                html = '';
-            }
-        } else if (CONFIG.activeSystem === 'health') {
-            if (CONFIG.role === 'teacher') {
-                html = `
-                    <button onclick="openModal('transaction')" class="p-4 rounded-xl border border-slate-200 hover:border-rose-500 hover:bg-rose-50 transition-all group text-left">
-                        <div class="w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mb-3 group-hover:bg-rose-600 group-hover:text-white transition-colors"><i class="fa-solid fa-weight-scale"></i></div>
-                        <div class="font-semibold text-slate-700 text-sm">${lang.btn_new_tx}</div>
-                    </button>
-                    <button onclick="openModal('multi-tx')" class="p-4 rounded-xl border border-slate-200 hover:border-rose-500 hover:bg-rose-50 transition-all group text-left">
-                        <div class="w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mb-3 group-hover:bg-rose-600 group-hover:text-white transition-colors"><i class="fa-solid fa-heart-pulse"></i></div>
-                        <div class="font-semibold text-slate-700 text-sm">${lang.btn_batch_tx}</div>
-                    </button>
-                `;
-            } else if (CONFIG.role === 'parent') {
-                html = '';
-            }
-        } else if (CONFIG.activeSystem === 'profile') {
-            if (CONFIG.role === 'teacher') {
-                html = `
-                    <button onclick="openModal('transaction')" class="p-4 rounded-xl border border-slate-200 hover:border-amber-500 hover:bg-amber-50 transition-all group text-left">
-                        <div class="w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mb-3 group-hover:bg-amber-600 group-hover:text-white transition-colors"><i class="fa-solid fa-pencil"></i></div>
-                        <div class="font-semibold text-slate-700 text-sm">${lang.btn_new_tx}</div>
-                    </button>
-                    <button onclick="openModal('multi-tx')" class="p-4 rounded-xl border border-slate-200 hover:border-amber-500 hover:bg-amber-50 transition-all group text-left">
-                        <div class="w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mb-3 group-hover:bg-amber-600 group-hover:text-white transition-colors"><i class="fa-solid fa-users"></i></div>
-                        <div class="font-semibold text-slate-700 text-sm">${lang.btn_batch_tx}</div>
-                    </button>
-                `;
-            } else if (CONFIG.role === 'parent') {
-                html = '';
-            }
-        }
-        
+        const html = SystemCore.getActionsHTML(CONFIG.activeSystem, CONFIG.role, lang);
         c.innerHTML = html;
     },
 
@@ -1230,6 +1158,10 @@ window.openModal = (n) => {
         if(list) { list.style.maxHeight = ''; list.style.overflow = ''; }
         inner.style.maxHeight = '95vh';
         inner.style.overflow = 'hidden';
+    }
+    if(n.includes('settings')) {
+        const versionBadge = document.getElementById('version-badge');
+        if(versionBadge) versionBadge.textContent = CONFIG.version;
     }
     if(n.includes('transaction')) app.updateSelectOptions();
     if(n.includes('multi-tx')) {
