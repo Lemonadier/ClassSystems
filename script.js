@@ -80,7 +80,9 @@ const app = {
         const expiry = parseInt(localStorage.getItem('cb_session_expiry') || '0');
         if (expiry > Date.now()) {
             CONFIG.role = localStorage.getItem('cb_session_role');
-            if (CONFIG.role === 'student') CONFIG.user = JSON.parse(localStorage.getItem('cb_session_user'));
+            if (CONFIG.role === 'parent') CONFIG.user = JSON.parse(localStorage.getItem('cb_session_user'));
+            const savedUrl = localStorage.getItem('cb_session_api_url');
+            if(savedUrl) CONFIG.apiUrl = savedUrl;
             app.showLauncher();
         } else if(expiry > 0) app.logout();
 
@@ -103,10 +105,22 @@ const app = {
 
     setLang: (lang) => {
         localStorage.setItem('cb_lang', lang);
+        CONFIG.lang = lang;
         document.querySelectorAll('[data-i18n]').forEach(el => {
             const key = el.getAttribute('data-i18n');
             if(i18n[lang][key]) el.textContent = i18n[lang][key];
         });
+        // Update language button styles
+        document.getElementById('btn-lang-en').classList.toggle('active', lang === 'en');
+        document.getElementById('btn-lang-th').classList.toggle('active', lang === 'th');
+        document.getElementById('btn-lang-en').classList.toggle('bg-indigo-600', lang === 'en');
+        document.getElementById('btn-lang-en').classList.toggle('text-white', lang === 'en');
+        document.getElementById('btn-lang-en').classList.toggle('bg-white', lang !== 'en');
+        document.getElementById('btn-lang-en').classList.toggle('text-slate-800', lang !== 'en');
+        document.getElementById('btn-lang-th').classList.toggle('bg-indigo-600', lang === 'th');
+        document.getElementById('btn-lang-th').classList.toggle('text-white', lang === 'th');
+        document.getElementById('btn-lang-th').classList.toggle('bg-white', lang !== 'th');
+        document.getElementById('btn-lang-th').classList.toggle('text-slate-800', lang !== 'th');
     },
 
     loading: (show) => {
@@ -195,49 +209,49 @@ const app = {
                 `;
             }
         } else if (CONFIG.activeSystem === 'attendance') {
-            html = `
-                <button onclick="openModal('transaction')" class="p-4 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 transition-all group text-left">
-                    <div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-3 group-hover:bg-emerald-600 group-hover:text-white transition-colors"><i class="fa-solid fa-check-circle"></i></div>
-                    <div class="font-semibold text-slate-700 text-sm">${lang.btn_new_tx}</div>
-                </button>
-            `;
             if (CONFIG.role === 'teacher') {
-                html += `
+                html = `
+                    <button onclick="openModal('transaction')" class="p-4 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 transition-all group text-left">
+                        <div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-3 group-hover:bg-emerald-600 group-hover:text-white transition-colors"><i class="fa-solid fa-check-circle"></i></div>
+                        <div class="font-semibold text-slate-700 text-sm">${lang.btn_new_tx}</div>
+                    </button>
                     <button onclick="openModal('multi-tx')" class="p-4 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 transition-all group text-left">
                         <div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-3 group-hover:bg-emerald-600 group-hover:text-white transition-colors"><i class="fa-solid fa-users-check"></i></div>
                         <div class="font-semibold text-slate-700 text-sm">${lang.btn_batch_tx}</div>
                     </button>
                 `;
+            } else if (CONFIG.role === 'parent') {
+                html = '';
             }
         } else if (CONFIG.activeSystem === 'health') {
-            html = `
-                <button onclick="openModal('transaction')" class="p-4 rounded-xl border border-slate-200 hover:border-rose-500 hover:bg-rose-50 transition-all group text-left">
-                    <div class="w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mb-3 group-hover:bg-rose-600 group-hover:text-white transition-colors"><i class="fa-solid fa-weight-scale"></i></div>
-                    <div class="font-semibold text-slate-700 text-sm">${lang.btn_new_tx}</div>
-                </button>
-            `;
             if (CONFIG.role === 'teacher') {
-                html += `
+                html = `
+                    <button onclick="openModal('transaction')" class="p-4 rounded-xl border border-slate-200 hover:border-rose-500 hover:bg-rose-50 transition-all group text-left">
+                        <div class="w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mb-3 group-hover:bg-rose-600 group-hover:text-white transition-colors"><i class="fa-solid fa-weight-scale"></i></div>
+                        <div class="font-semibold text-slate-700 text-sm">${lang.btn_new_tx}</div>
+                    </button>
                     <button onclick="openModal('multi-tx')" class="p-4 rounded-xl border border-slate-200 hover:border-rose-500 hover:bg-rose-50 transition-all group text-left">
                         <div class="w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mb-3 group-hover:bg-rose-600 group-hover:text-white transition-colors"><i class="fa-solid fa-heart-pulse"></i></div>
                         <div class="font-semibold text-slate-700 text-sm">${lang.btn_batch_tx}</div>
                     </button>
                 `;
+            } else if (CONFIG.role === 'parent') {
+                html = '';
             }
         } else if (CONFIG.activeSystem === 'profile') {
-            html = `
-                <button onclick="openModal('transaction')" class="p-4 rounded-xl border border-slate-200 hover:border-amber-500 hover:bg-amber-50 transition-all group text-left">
-                    <div class="w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mb-3 group-hover:bg-amber-600 group-hover:text-white transition-colors"><i class="fa-solid fa-pencil"></i></div>
-                    <div class="font-semibold text-slate-700 text-sm">${lang.btn_new_tx}</div>
-                </button>
-            `;
             if (CONFIG.role === 'teacher') {
-                html += `
+                html = `
+                    <button onclick="openModal('transaction')" class="p-4 rounded-xl border border-slate-200 hover:border-amber-500 hover:bg-amber-50 transition-all group text-left">
+                        <div class="w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mb-3 group-hover:bg-amber-600 group-hover:text-white transition-colors"><i class="fa-solid fa-pencil"></i></div>
+                        <div class="font-semibold text-slate-700 text-sm">${lang.btn_new_tx}</div>
+                    </button>
                     <button onclick="openModal('multi-tx')" class="p-4 rounded-xl border border-slate-200 hover:border-amber-500 hover:bg-amber-50 transition-all group text-left">
                         <div class="w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mb-3 group-hover:bg-amber-600 group-hover:text-white transition-colors"><i class="fa-solid fa-users"></i></div>
                         <div class="font-semibold text-slate-700 text-sm">${lang.btn_batch_tx}</div>
                     </button>
                 `;
+            } else if (CONFIG.role === 'parent') {
+                html = '';
             }
         }
         
@@ -313,9 +327,11 @@ const app = {
         if (CONFIG.role === 'teacher') {
              if (CONFIG.activeSystem === 'bank') globalMetric = state.students.reduce((acc, s) => acc + s.balance, 0);
              else globalMetric = state.students.length > 0 ? (state.students.reduce((acc, s) => acc + parseFloat(s.balance), 0) / state.students.length) : 0;
+        } else if (CONFIG.role === 'parent') {
+             globalMetric = current?.balance || 0;
         }
 
-        const displayMetric = CONFIG.role === 'student' ? (current?.balance || 0) : globalMetric;
+        const displayMetric = (CONFIG.role === 'parent') ? (current?.balance || 0) : (CONFIG.role === 'student' ? (current?.balance || 0) : globalMetric);
         
         document.getElementById('stat-balance').textContent = `${sys.unit === '฿' ? '฿' : ''}${app.formatMoney(displayMetric)} ${sys.unit !== '฿' ? sys.unit : ''}`;
         document.getElementById('stat-count').textContent = state.transactions.length;
@@ -332,7 +348,12 @@ const app = {
         const sys = CONFIG.activeSystem;
         const lang = i18n[CONFIG.lang];
         
-        container.innerHTML = state.students.map(s => {
+        let studentsToDisplay = state.students;
+        if(CONFIG.role === 'parent') {
+            studentsToDisplay = state.students.filter(s => String(s['Student ID']) === String(CONFIG.user?.['Student ID']));
+        }
+        
+        container.innerHTML = studentsToDisplay.map(s => {
             let dataDisplay = '';
             if(sys === 'bank') {
                 dataDisplay = `<div class="text-2xl font-bold text-indigo-600">฿${app.formatMoney(s.balance)}</div>`;
@@ -802,7 +823,8 @@ const app = {
              const d = await res.json();
              app.loading(false);
              if(d.status === 'success') { 
-                 localStorage.setItem('cb_session_token', key); 
+                 localStorage.setItem('cb_session_token', key);
+                 localStorage.setItem('cb_session_api_url', CONFIG.apiUrl);
                  localStorage.setItem('cb_session_expiry', Date.now() + CONFIG.sessionTimeout);
                  CONFIG.role = 'teacher';
                  app.showLauncher();
@@ -818,9 +840,9 @@ const app = {
             app.loading(false);
             if (s) { 
                 localStorage.setItem('cb_session_user', JSON.stringify(s));
-                localStorage.setItem('cb_session_role', 'student');
+                localStorage.setItem('cb_session_role', 'parent');
                 localStorage.setItem('cb_session_expiry', Date.now() + CONFIG.sessionTimeout);
-                CONFIG.role = 'student'; CONFIG.user = s;
+                CONFIG.role = 'parent'; CONFIG.user = s;
                 app.showLauncher();
             } else Swal.fire('Not Found', 'Student ID not found', 'error');
         });
