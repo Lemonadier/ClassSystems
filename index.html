@@ -187,10 +187,14 @@
                                 <div id="chart-student-list" class="space-y-1 mt-1"></div>
                             </div>
                         </div>
+                        <select id="analytics-student-filter" onchange="app.renderCharts()" class="hidden md:block px-3 py-2 rounded-lg border border-slate-200 text-sm ml-2">
+                            <option value="">All Students</option>
+                        </select>
                         <div class="flex items-center gap-2 mt-2 md:mt-0">
                             <input type="date" id="analytics-date-from" class="px-3 py-2 rounded-lg border border-slate-200 text-sm" placeholder="From">
                             <input type="date" id="analytics-date-to" class="px-3 py-2 rounded-lg border border-slate-200 text-sm" placeholder="To">
                             <button onclick="app.renderWeeklyAttendance()" class="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold">Apply</button>
+                            <button onclick="app.openWeeklyFullscreen()" class="px-3 py-2 rounded-lg border border-slate-200 text-sm ml-2">Full</button>
                         </div>
                     </div>
                     <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-96 relative">
@@ -317,6 +321,19 @@
             <!-- System-specific fields -->
             <div id="dynamic-multi-fields" class="space-y-3"></div>
             <div class="flex gap-2 mt-4"><button type="button" onclick="closeModal('multi-tx')" class="flex-1 py-3 text-slate-500 font-bold" data-i18n="btn_cancel">Cancel</button><button onclick="app.processMultiTx()" class="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold" data-i18n="btn_submit">Submit</button></div>
+        </div>
+    </div>
+
+    <!-- WEEKLY FULLSCREEN MODAL -->
+    <div id="modal-weekly" class="fixed inset-0 z-[70] bg-black/50 hidden items-center justify-center p-3">
+        <div class="bg-white rounded-2xl w-[95vw] h-[95vh] p-4 shadow-2xl overflow-auto">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold">Weekly Attendance (Full)</h3>
+                <div class="flex items-center gap-2">
+                    <button onclick="closeModal('weekly')" class="px-3 py-2 rounded-lg border border-slate-200">Close</button>
+                </div>
+            </div>
+            <div id="weekly-attendance-full" class="h-full overflow-auto"></div>
         </div>
     </div>
 

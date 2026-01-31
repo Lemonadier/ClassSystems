@@ -413,6 +413,34 @@ const app = {
         const now = new Date();
         const dateInput = document.getElementById('tx-date');
         if(dateInput) dateInput.value = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+
+        // Show student summary/balance below selector when changed
+        const bal = document.getElementById('tx-student-bal');
+        function updateBalDisplay(id) {
+            if(!bal) return;
+            if(!id) { bal.innerHTML = 'Bal: -'; return; }
+            const s = state.students.find(x => x['Student ID'] === id);
+            if(!s) { bal.innerHTML = 'Bal: -'; return; }
+            // compute balance from transactions for bank; otherwise show last known data
+            const txs = state.transactions.filter(t => String(t['Student ID']) === String(id));
+            let summary = '';
+            if(CONFIG.activeSystem === 'bank') {
+                let balval = 0;
+                txs.forEach(t => { const val = parseFloat(t.Amount)||0; if(t.Type === 'Deposit') balval += val; else balval -= val; });
+                summary = `<div class="text-xs text-slate-400">Balance: <b class='text-slate-700'>${app.formatMoney(balval)}</b></div>`;
+            } else if(CONFIG.activeSystem === 'attendance') {
+                const last = txs.sort((a,b)=> new Date(b.Date)-new Date(a.Date))[0];
+                summary = `<div class="text-xs text-slate-400">Last: <b class='text-slate-700'>${last ? (last.Status||last.Type) : 'N/A'}</b></div>`;
+            } else if(CONFIG.activeSystem === 'health') {
+                const last = txs.sort((a,b)=> new Date(b.Date)-new Date(a.Date))[0];
+                summary = `<div class="text-xs text-slate-400">Weight/Height: <b class='text-slate-700'>${last ? (last.Weight||'') : ''} / ${last ? (last.Height||'') : ''}</b></div>`;
+            } else {
+                const last = txs.sort((a,b)=> new Date(b.Date)-new Date(a.Date))[0];
+                summary = `<div class="text-xs text-slate-400">Last Entry: <b class='text-slate-700'>${last ? (last.Note||last.Type||'') : 'N/A'}</b></div>`;
+            }
+            bal.innerHTML = summary;
+        }
+        sel.addEventListener('change', (ev) => updateBalDisplay(ev.target.value));
     },
 
     handleTransaction: async (e) => {
@@ -539,7 +567,11 @@ const app = {
         
         // Filter students and transactions
         let filteredStudents = state.students.map(s => ({...s, balance: 0}));
-        if(studentFilter) {
+        // If there are checked boxes in the select dropdown, use them
+        const checkedBoxes = Array.from(document.querySelectorAll('#chart-student-list input[type="checkbox"]:checked')).map(cb => cb.value);
+        if(checkedBoxes.length > 0) {
+            filteredStudents = state.students.filter(s => checkedBoxes.includes(s['Student ID'])).map(s => ({...s, balance: 0}));
+        } else if(studentFilter) {
             filteredStudents = state.students.filter(s => s['Student ID'] === studentFilter).map(s => ({...s, balance: 0}));
         }
         
@@ -639,6 +671,19 @@ const app = {
                 filter.appendChild(opt);
             });
         }
+        // Populate checkbox list inside the Select Students dropdown
+        const list = document.getElementById('chart-student-list');
+        if(list && list.children.length === 0) {
+            state.students.sort((a,b)=> (a.No||0)-(b.No||0)).forEach(s => {
+                const id = s['Student ID'];
+                const wrap = document.createElement('label');
+                wrap.className = 'flex items-center gap-2 p-2 hover:bg-slate-50 rounded cursor-pointer';
+                wrap.innerHTML = `<input type="checkbox" value="${id}" checked class="w-4 h-4 chart-student-checkbox"><span class="text-sm">${s.No}. ${s.Name}</span>`;
+                list.appendChild(wrap);
+            });
+            // when any checkbox changes, re-render charts and weekly view
+            list.querySelectorAll('.chart-student-checkbox').forEach(cb => cb.addEventListener('change', () => { app.renderCharts(); app.renderWeeklyAttendance(); }));
+        }
     },
 
     renderWeeklyAttendance: () => {
@@ -656,8 +701,11 @@ const app = {
             return match;
         });
 
+        // Determine selected students: prefer checkbox list, fall back to single select
+        const checkedIds = Array.from(document.querySelectorAll('#chart-student-list input[type="checkbox"]:checked')).map(cb => cb.value);
         let displayStudents = state.students;
-        if(studentFilter) displayStudents = state.students.filter(s => s['Student ID'] === studentFilter);
+        if(checkedIds.length > 0) displayStudents = state.students.filter(s => checkedIds.includes(s['Student ID']));
+        else if(studentFilter) displayStudents = state.students.filter(s => s['Student ID'] === studentFilter);
 
         // attendanceMap[studentId][dateKey] = status
         const attendanceMap = {};
@@ -704,7 +752,7 @@ const app = {
 
             html += `<div class="mb-6 bg-white p-4 rounded-xl shadow-sm overflow-x-auto">`;
             html += `<div class="mb-2 font-semibold text-slate-600">Week: ${weekStart.toLocaleDateString()}</div>`;
-            html += `<table class="w-full border-collapse"><thead><tr><th class="p-2 text-left w-48">Student</th>`;
+            html += `<table class="w-full border-collapse" style="min-width:700px"><thead><tr><th class="p-2 text-left w-48">Student</th>`;
             cols.forEach(d => { html += `<th class="p-2 text-center text-xs text-slate-500">${d.toLocaleDateString(undefined,{weekday:'short', month:'short', day:'numeric'})}</th>`; });
             html += `</tr></thead><tbody>`;
 
@@ -746,10 +794,12 @@ const app = {
 
     chartSelectAll: () => {
         document.querySelectorAll('#chart-student-list input[type="checkbox"]').forEach(cb => cb.checked = true);
+        app.renderCharts(); app.renderWeeklyAttendance();
     },
 
     chartClearAll: () => {
         document.querySelectorAll('#chart-student-list input[type="checkbox"]').forEach(cb => cb.checked = false);
+        app.renderCharts(); app.renderWeeklyAttendance();
     },
 
     // --- CORE ---
@@ -934,6 +984,25 @@ const app = {
         });
         
         if(transactions.length) {
+            // If attendance, show confirmation summary
+            if(sys === 'attendance') {
+                const counts = { Present:0, Late:0, Absent:0 };
+                const names = { Present:[], Late:[], Absent:[] };
+                transactions.forEach(tx => {
+                    const t = tx.type || tx.type;
+                    if(t === 'Present') { counts.Present++; names.Present.push(tx.studentId); }
+                    else if(t === 'Late') { counts.Late++; names.Late.push(tx.studentId); }
+                    else if(t === 'Absent') { counts.Absent++; names.Absent.push(tx.studentId); }
+                });
+
+                function idToName(id){ const s = state.students.find(x=>x['Student ID']===id); return s ? `${s.No}. ${s.Name}` : id; }
+                const makeList = arr => `<ul class="text-left" style="margin:0;padding-left:16px">${arr.slice(0,50).map(i=>`<li>${idToName(i)}</li>`).join('')}</ul>`;
+                const html = `<div class="p-2 text-left"><div><b>Present:</b> ${counts.Present}</div><div><b>Late:</b> ${counts.Late}</div><div><b>Absent:</b> ${counts.Absent}</div><hr class="my-2">${counts.Present?'<div><b>Present:</b>'+makeList(names.Present)+'</div>':''}${counts.Late?'<div><b>Late:</b>'+makeList(names.Late)+'</div>':''}${counts.Absent?'<div><b>Absent:</b>'+makeList(names.Absent)+'</div>':''}</div>`;
+
+                const res = await Swal.fire({ title: `Confirm ${transactions.length} attendance entries`, html, showCancelButton: true, confirmButtonText: 'Confirm', width: '600px' });
+                if(!res.isConfirmed) return;
+            }
+
             console.log('Posting batch transactions', transactions);
             await app.postData({ op: 'batch_add_transactions', transactions }, `Processed ${transactions.length} entries`);
         }
@@ -1036,10 +1105,14 @@ window.openModal = (n) => {
     modal.classList.add('flex');
     const inner = modal.querySelector(':scope > div');
     if(n.includes('multi-tx') && CONFIG.activeSystem === 'attendance' && inner) {
-        inner.style.width = '80vw';
-        inner.style.maxWidth = '80vw';
-        inner.style.height = '80vh';
-        inner.style.maxHeight = '80vh';
+        inner.style.width = '95vw';
+        inner.style.maxWidth = '95vw';
+        inner.style.maxHeight = '';
+        inner.style.overflow = '';
+        const list = modal.querySelector('#multi-student-list');
+        if(list) { list.style.maxHeight = ''; list.style.overflow = ''; }
+        inner.style.maxHeight = '95vh';
+        inner.style.overflow = 'hidden';
     }
     if(n.includes('transaction')) app.updateSelectOptions();
     if(n.includes('multi-tx')) {
@@ -1069,10 +1142,26 @@ window.openModal = (n) => {
                     `).join('')}
                 </div>
             `;
+            if(list) {
+                list.style.maxHeight = 'calc(95vh - 220px)';
+                list.style.overflow = 'auto';
+            }
         } else {
             const list = document.getElementById('multi-student-list');
             list.innerHTML = state.students.map(s => `<label class="flex items-center gap-2 p-2 hover:bg-slate-50 rounded cursor-pointer"><input type="checkbox" value="${s['Student ID']}" class="w-4 h-4"><span class="text-sm">${s.No}. ${s.Name}</span></label>`).join('');
         }
+    }
+};
+
+window.openWeeklyFullscreen = () => {
+    // render current weekly view then copy it into fullscreen modal and open it
+    app.renderWeeklyAttendance();
+    const content = document.getElementById('weekly-attendance-container')?.innerHTML || '';
+    const target = document.getElementById('weekly-attendance-full');
+    if(target) target.innerHTML = content;
+    const modal = document.getElementById('modal-weekly');
+    if(modal) {
+        modal.classList.remove('hidden'); modal.classList.add('flex');
     }
 };
 
