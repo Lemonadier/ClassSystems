@@ -723,25 +723,21 @@ const app = {
                     const status = allDays[weekKey][dateKey];
                     const dayName = dayNames[date.getDay()];
                     
-                    let bgColor = 'bg-gray-100';
-                    let icon = '○';
+                    let bgColor = 'bg-gray-200';
                     let title = 'No data';
                     
                     if(status === 'Present') {
-                        bgColor = 'bg-green-100 text-green-700';
-                        icon = '✓';
+                        bgColor = 'bg-green-500';
                         title = 'Present';
                     } else if(status === 'Late') {
-                        bgColor = 'bg-amber-100 text-amber-700';
-                        icon = '◑';
+                        bgColor = 'bg-yellow-500';
                         title = 'Late';
                     } else if(status === 'Absent') {
-                        bgColor = 'bg-red-100 text-red-700';
-                        icon = '✗';
+                        bgColor = 'bg-red-500';
                         title = 'Absent';
                     }
                     
-                    html += `<div class="w-8 h-8 flex items-center justify-center rounded-md ${bgColor} text-xs font-bold cursor-help" title="${title}">${icon}</div>`;
+                    html += `<div class="w-8 h-8 rounded-md ${bgColor} cursor-help shadow-sm hover:shadow-md transition-all" title="${title}"></div>`;
                 });
                 
                 html += `</div></div>`;
@@ -898,6 +894,13 @@ const app = {
         if(url) localStorage.setItem('cb_api_url', url);
         location.reload();
     },
+    saveApiUrl: () => {
+        const url = document.getElementById('api-url').value.trim();
+        if(!url) { Swal.fire('Error', 'Enter a valid API URL', 'error'); return; }
+        localStorage.setItem('cb_api_url', url);
+        CONFIG.apiUrl = url;
+        Swal.fire('Success', 'API URL saved', 'success');
+    },
     copyShareLink: () => { const link = `${window.location.protocol}//${window.location.host}${window.location.pathname}?config=${btoa(CONFIG.apiUrl)}`; navigator.clipboard.writeText(link); Swal.fire('Copied', '', 'success'); },
     handleAddStudent: async (e) => {
         e.preventDefault();
@@ -911,10 +914,17 @@ const app = {
         if(batch.length) await app.postData({ op: 'batch_add_students', students: batch }, 'Batch Added');
     },
     processMultiTx: async () => {
-        const checklist = document.querySelectorAll('#multi-student-list input[type="checkbox"]:checked');
+        const sys = CONFIG.activeSystem;
+        let checklist = [];
+        
+        if(sys === 'attendance') {
+            checklist = document.querySelectorAll('#multi-student-list input[type="radio"]:checked');
+        } else {
+            checklist = document.querySelectorAll('#multi-student-list input[type="checkbox"]:checked');
+        }
+        
         if (checklist.length === 0) { Swal.fire('Info', 'Select at least one student', 'info'); return; }
         
-        const sys = CONFIG.activeSystem;
         const transactions = [];
         const date = new Date().toISOString().split('T')[0];
         
@@ -926,7 +936,7 @@ const app = {
                 type = document.querySelector('input[name="multi-type"]:checked')?.value || 'Deposit';
                 amount = parseFloat(document.getElementById('multi-amount')?.value) || 0;
             } else if (sys === 'attendance') {
-                type = document.getElementById('multi-status')?.value || 'Present';
+                type = checkbox.value || 'Present';
                 amount = type === 'Present' ? 1 : (type === 'Late' ? 0.5 : 0);
             } else if (sys === 'health') {
                 const w = parseFloat(document.getElementById('multi-weight')?.value) || 0;
@@ -967,13 +977,7 @@ const app = {
                 </div>
             `;
         } else if (sys === 'attendance') {
-            container.innerHTML = `
-                <select id="multi-status" required class="w-full p-3 rounded-xl border border-slate-200 outline-none focus:border-indigo-500">
-                    <option value="Present">${lang.label_present}</option>
-                    <option value="Late">${lang.label_late}</option>
-                    <option value="Absent">${lang.label_absent}</option>
-                </select>
-            `;
+            container.innerHTML = '<p class="text-xs text-slate-500 text-center py-2">Select attendance status for each student above</p>';
         } else if (sys === 'health') {
             container.innerHTML = `
                 <input type="number" id="multi-weight" placeholder="${lang.label_weight}" step="0.1" required class="w-full p-3 rounded-xl border border-slate-200 outline-none focus:border-indigo-500">
@@ -1046,8 +1050,35 @@ window.openModal = (n) => {
     if(n.includes('transaction')) app.updateSelectOptions();
     if(n.includes('multi-tx')) {
         app.populateMultiTxFields();
-        const list = document.getElementById('multi-student-list');
-        list.innerHTML = state.students.map(s => `<label class="flex items-center gap-2 p-2 hover:bg-slate-50 rounded cursor-pointer"><input type="checkbox" value="${s['Student ID']}" class="w-4 h-4"><span class="text-sm">${s.No}. ${s.Name}</span></label>`).join('');
+        if(CONFIG.activeSystem === 'attendance') {
+            const list = document.getElementById('multi-student-list');
+            list.innerHTML = `
+                <div class="space-y-2">
+                    ${state.students.map(s => `
+                        <div class="flex items-center gap-2 p-2 hover:bg-slate-100 rounded border border-slate-200">
+                            <span class="text-sm font-semibold min-w-40">${s.No}. ${s.Name}</span>
+                            <div class="flex gap-2 flex-1">
+                                <label class="flex items-center gap-1 px-2 py-1 rounded bg-green-50 border border-green-200 cursor-pointer hover:bg-green-100">
+                                    <input type="radio" name="status-${s['Student ID']}" value="Present" class="w-4 h-4 attendance-status" data-student="${s['Student ID']}">
+                                    <span class="text-xs font-bold text-green-700">Present</span>
+                                </label>
+                                <label class="flex items-center gap-1 px-2 py-1 rounded bg-yellow-50 border border-yellow-200 cursor-pointer hover:bg-yellow-100">
+                                    <input type="radio" name="status-${s['Student ID']}" value="Late" class="w-4 h-4 attendance-status" data-student="${s['Student ID']}">
+                                    <span class="text-xs font-bold text-yellow-700">Late</span>
+                                </label>
+                                <label class="flex items-center gap-1 px-2 py-1 rounded bg-red-50 border border-red-200 cursor-pointer hover:bg-red-100">
+                                    <input type="radio" name="status-${s['Student ID']}" value="Absent" class="w-4 h-4 attendance-status" data-student="${s['Student ID']}">
+                                    <span class="text-xs font-bold text-red-700">Absent</span>
+                                </label>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        } else {
+            const list = document.getElementById('multi-student-list');
+            list.innerHTML = state.students.map(s => `<label class="flex items-center gap-2 p-2 hover:bg-slate-50 rounded cursor-pointer"><input type="checkbox" value="${s['Student ID']}" class="w-4 h-4"><span class="text-sm">${s.No}. ${s.Name}</span></label>`).join('');
+        }
     }
 };
 
