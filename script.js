@@ -641,112 +641,68 @@ const app = {
         const dateFrom = document.getElementById('analytics-date-from')?.value;
         const dateTo = document.getElementById('analytics-date-to')?.value;
         
-        // Filter transactions
-        let filteredTxns = state.transactions;
-        if(dateFrom || dateTo) {
-            filteredTxns = state.transactions.filter(t => {
-                const txDate = new Date(t.Date);
-                const match = (!dateFrom || txDate >= new Date(dateFrom)) && (!dateTo || txDate <= new Date(dateTo));
-                return match;
-            });
-        }
-        
-        // Get students to display
-        let displayStudents = state.students;
-        if(studentFilter) {
-            displayStudents = state.students.filter(s => s['Student ID'] === studentFilter);
-        }
-        
-        // Build week grid for each student
-        let html = '<div class="space-y-6">';
-        
-        displayStudents.forEach(student => {
-            const studentTxns = filteredTxns.filter(t => String(t['Student ID']) === String(student['Student ID']));
-            
-            // Group by week
-            const weekMap = {};
-            studentTxns.forEach(txn => {
-                const date = new Date(txn.Date);
-                const weekStart = new Date(date);
-                weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-                const weekKey = weekStart.toISOString().split('T')[0];
-                
-                if(!weekMap[weekKey]) weekMap[weekKey] = {};
-                const dateKey = date.toISOString().split('T')[0];
-                weekMap[weekKey][dateKey] = txn.Status || txn.Type;
-            });
-            
-            // Get all days from dateFrom to dateTo and group by week
-            const allDays = {};
-            const startDate = dateFrom ? new Date(dateFrom) : new Date(Date.now() - 90*24*60*60*1000); // Last 90 days default
-            const endDate = dateTo ? new Date(dateTo) : new Date();
-            
-            for(let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-                const dateKey = d.toISOString().split('T')[0];
-                const weekStart = new Date(d);
-                weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-                const weekKey = weekStart.toISOString().split('T')[0];
-                
-                if(!allDays[weekKey]) allDays[weekKey] = {};
-                allDays[weekKey][dateKey] = null;
-            }
-            
-            // Merge transaction data into all days
-            Object.keys(weekMap).forEach(week => {
-                if(!allDays[week]) allDays[week] = {};
-                Object.assign(allDays[week], weekMap[week]);
-            });
-            
-            // Render student's weeks
-            const weeks = Object.keys(allDays).sort();
-            if(weeks.length === 0) return;
-            
-            html += `<div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <h4 class="font-bold text-slate-700 mb-3">${student.Name} - ${student.Grade}</h4>
-                <div class="space-y-2">`;
-            
-            weeks.forEach(weekKey => {
-                const weekDate = new Date(weekKey);
-                const weekEnd = new Date(weekDate);
-                weekEnd.setDate(weekEnd.getDate() + 6);
-                const weekLabel = `${weekDate.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})} - ${weekEnd.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})}`;
-                
-                html += `<div class="flex gap-1 items-center">
-                    <span class="text-xs text-slate-500 font-semibold w-20 truncate" title="${weekLabel}">${weekLabel}</span>
-                    <div class="flex gap-1">`;
-                
-                const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-                const days = Object.keys(allDays[weekKey]).sort();
-                
-                days.forEach(dateKey => {
-                    const date = new Date(dateKey);
-                    const status = allDays[weekKey][dateKey];
-                    const dayName = dayNames[date.getDay()];
-                    
-                    let bgColor = 'bg-gray-200';
-                    let title = 'No data';
-                    
-                    if(status === 'Present') {
-                        bgColor = 'bg-green-500';
-                        title = 'Present';
-                    } else if(status === 'Late') {
-                        bgColor = 'bg-yellow-500';
-                        title = 'Late';
-                    } else if(status === 'Absent') {
-                        bgColor = 'bg-red-500';
-                        title = 'Absent';
-                    }
-                    
-                    html += `<div class="w-8 h-8 rounded-md ${bgColor} cursor-help shadow-sm hover:shadow-md transition-all" title="${title}"></div>`;
-                });
-                
-                html += `</div></div>`;
-            });
-            
-            html += `</div></div>`;
+        // Build attendance map by student/date
+        const filteredTxns = state.transactions.filter(t => {
+            const txDate = new Date(t.Date);
+            const match = (!dateFrom || txDate >= new Date(dateFrom)) && (!dateTo || txDate <= new Date(dateTo));
+            return match;
         });
-        
-        html += '</div>';
+
+        let displayStudents = state.students;
+        if(studentFilter) displayStudents = state.students.filter(s => s['Student ID'] === studentFilter);
+
+        // attendanceMap[studentId][dateKey] = status
+        const attendanceMap = {};
+        displayStudents.forEach(s => attendanceMap[s['Student ID']] = {});
+        filteredTxns.forEach(t => {
+            if(attendanceMap[t['Student ID']]) {
+                const key = new Date(t.Date).toISOString().split('T')[0];
+                attendanceMap[t['Student ID']][key] = t.Status || t.Type;
+            }
+        });
+
+        // Determine week starts (Monday) between range
+        const start = dateFrom ? new Date(dateFrom) : (function(){ const d=new Date(); d.setDate(d.getDate()-7); return d; })();
+        const end = dateTo ? new Date(dateTo) : new Date();
+
+        function getMonday(d){ const dt=new Date(d); const day = dt.getDay(); const diff = (day === 0 ? -6 : 1 - day); dt.setDate(dt.getDate() + diff); dt.setHours(0,0,0,0); return dt; }
+
+        const weeks = [];
+        let cur = getMonday(start);
+        while(cur <= end) {
+            weeks.push(new Date(cur));
+            cur = new Date(cur); cur.setDate(cur.getDate() + 7);
+        }
+
+        let html = '';
+        // For each week render a table: columns Mon-Fri
+        weeks.forEach(weekStart => {
+            const cols = [];
+            for(let i=0;i<5;i++){ const d = new Date(weekStart); d.setDate(d.getDate() + i); cols.push(d); }
+
+            html += `<div class="mb-6 bg-white p-4 rounded-xl shadow-sm overflow-x-auto">`;
+            html += `<div class="mb-2 font-semibold text-slate-600">Week: ${weekStart.toLocaleDateString()}</div>`;
+            html += `<table class="w-full border-collapse"><thead><tr><th class="p-2 text-left w-48">Student</th>`;
+            cols.forEach(d => { html += `<th class="p-2 text-center text-xs text-slate-500">${d.toLocaleDateString(undefined,{weekday:'short', month:'short', day:'numeric'})}</th>`; });
+            html += `</tr></thead><tbody>`;
+
+            displayStudents.forEach(s => {
+                html += `<tr class="border-t"><td class="p-2 font-medium">${s.No}. ${s.Name}</td>`;
+                cols.forEach(d => {
+                    const key = d.toISOString().split('T')[0];
+                    const status = attendanceMap[s['Student ID']][key];
+                    let cls = 'bg-gray-200'; let title='No data';
+                    if(status === 'Present'){ cls='bg-green-500'; title='Present'; }
+                    else if(status === 'Late'){ cls='bg-yellow-500'; title='Late'; }
+                    else if(status === 'Absent'){ cls='bg-red-500'; title='Absent'; }
+                    html += `<td class="p-2 text-center"><div class="mx-auto w-8 h-8 rounded ${cls}" title="${title}"></div></td>`;
+                });
+                html += `</tr>`;
+            });
+
+            html += `</tbody></table></div>`;
+        });
+
         container.innerHTML = html;
     },
 
@@ -929,13 +885,15 @@ const app = {
         const date = new Date().toISOString().split('T')[0];
         
         checklist.forEach(checkbox => {
-            const sid = checkbox.value;
+            let sid = checkbox.value;
             let type = 'Entry', amount = 1, note = '';
             
             if (sys === 'bank') {
                 type = document.querySelector('input[name="multi-type"]:checked')?.value || 'Deposit';
                 amount = parseFloat(document.getElementById('multi-amount')?.value) || 0;
             } else if (sys === 'attendance') {
+                // checkbox is a radio input with data-student attribute
+                sid = checkbox.getAttribute('data-student') || checkbox.value;
                 type = checkbox.value || 'Present';
                 amount = type === 'Present' ? 1 : (type === 'Late' ? 0.5 : 0);
             } else if (sys === 'health') {
@@ -960,7 +918,14 @@ const app = {
         closeModal('multi-tx');
     },
     selectAllMulti: () => {
-        document.querySelectorAll('#multi-student-list input[type="checkbox"]').forEach(cb => cb.checked = true);
+        if (CONFIG.activeSystem === 'attendance') {
+            // set all student radios to Present
+            document.querySelectorAll('#multi-student-list input.attendance-status').forEach(r => {
+                if (r.value === 'Present') r.checked = true;
+            });
+        } else {
+            document.querySelectorAll('#multi-student-list input[type="checkbox"]').forEach(cb => cb.checked = true);
+        }
     },
 
     populateMultiTxFields: () => {
@@ -1047,6 +1012,13 @@ window.openModal = (n) => {
     const modal = document.getElementById(`modal-${n}`);
     modal.classList.remove('hidden');
     modal.classList.add('flex');
+    const inner = modal.querySelector(':scope > div');
+    if(n.includes('multi-tx') && CONFIG.activeSystem === 'attendance' && inner) {
+        inner.style.width = '80vw';
+        inner.style.maxWidth = '80vw';
+        inner.style.height = '80vh';
+        inner.style.maxHeight = '80vh';
+    }
     if(n.includes('transaction')) app.updateSelectOptions();
     if(n.includes('multi-tx')) {
         app.populateMultiTxFields();
@@ -1082,7 +1054,18 @@ window.openModal = (n) => {
     }
 };
 
-window.closeModal = (n) => { document.getElementById(`modal-${n}`).classList.add('hidden'); document.getElementById(`modal-${n}`).classList.remove('flex'); };
+window.closeModal = (n) => {
+    const modal = document.getElementById(`modal-${n}`);
+    const inner = modal?.querySelector(':scope > div');
+    if(inner) {
+        inner.style.width = '';
+        inner.style.maxWidth = '';
+        inner.style.height = '';
+        inner.style.maxHeight = '';
+    }
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+};
 
 // Toggle tx fields for Transfer mode
 app.toggleTxFields = () => {
