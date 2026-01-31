@@ -278,8 +278,34 @@ const app = {
             const data = await res.json();
             console.log('Received data:', data);
             if (data.status === 'success') {
-                state.students = data.students || [];
-                state.transactions = data.transactions || [];
+                // Normalize students and transactions to consistent keys
+                const rawStudents = data.students || [];
+                const rawTx = data.transactions || [];
+                state.students = rawStudents.map(s => {
+                    return {
+                        'Student ID': s['Student ID'] || s.studentId || s.id || s.ID || '',
+                        Name: s.Name || s.name || s.fullName || '',
+                        Grade: s.Grade || s.grade || s.Class || s.class || '',
+                        No: s.No || s.no || '',
+                        ...s
+                    };
+                });
+
+                state.transactions = rawTx.map(t => {
+                    return {
+                        'Student ID': t['Student ID'] || t.studentId || t.StudentID || t.student_id || t.sid || '',
+                        Date: t.Date || t.date || t.createdAt || t.created_at || '',
+                        Type: t.Type || t.type || '',
+                        Amount: t.Amount || t.amount || t.Value || t.value || '',
+                        Status: t.Status || t.status || '',
+                        BMI: t.BMI || t.bmi || '',
+                        Weight: t.Weight || t.weight || '',
+                        Height: t.Height || t.height || '',
+                        Score: t.Score || t.score || '',
+                        Note: t.Note || t.note || '',
+                        ...t
+                    };
+                });
                 console.log('Loaded students:', state.students.length, 'transactions:', state.transactions.length);
                 app.processData();
             } else {
@@ -348,6 +374,8 @@ const app = {
         app.updateSelectOptions();
         app.renderStudentCards();
         app.renderCharts();
+        // Ensure actions menu reflects current data/system/role after processing
+        app.updateActionsMenu();
     },
 
     renderStudentCards: () => {
@@ -573,6 +601,10 @@ const app = {
             filteredStudents = state.students.filter(s => checkedBoxes.includes(s['Student ID'])).map(s => ({...s, balance: 0}));
         } else if(studentFilter) {
             filteredStudents = state.students.filter(s => s['Student ID'] === studentFilter).map(s => ({...s, balance: 0}));
+        }
+        // If filtering resulted in zero students, fall back to all students
+        if(!filteredStudents || filteredStudents.length === 0) {
+            filteredStudents = state.students.map(s => ({...s, balance: 0}));
         }
         
         let filteredTxns = state.transactions;
