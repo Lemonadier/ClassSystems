@@ -16,9 +16,7 @@ const SystemCore = {
                     { id: 'batch-student', icon: 'fa-users', color: 'blue', label: lang.btn_batch_add },
                     { id: 'multi-tx', icon: 'fa-layer-group', color: 'purple', label: lang.btn_batch_tx }
                 ],
-                parent: [
-                    { id: 'transaction', icon: 'fa-money-bill-transfer', color: 'indigo', label: lang.btn_new_tx }
-                ]
+                parent: []
             },
             attendance: {
                 teacher: [

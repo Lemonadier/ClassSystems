@@ -98,9 +98,13 @@ const app = {
         if (expiry > Date.now()) {
             CONFIG.role = localStorage.getItem('cb_session_role');
             if (CONFIG.role === 'parent') CONFIG.user = JSON.parse(localStorage.getItem('cb_session_user'));
-            const savedUrl = localStorage.getItem('cb_session_api_url') || localStorage.getItem('cb_api_url');
-            if(savedUrl) CONFIG.apiUrl = savedUrl;
-            app.showLauncher();
+            const savedUrl = localStorage.getItem('cb_session_api_url') || localStorage.getItem('cb_api_url') || localStorage.getItem('cb_teacher_api_key');
+            if(savedUrl) {
+                localStorage.setItem('cb_api_url', savedUrl);
+                Object.defineProperty(CONFIG, 'apiUrl', { value: savedUrl, writable: true, configurable: true });
+            }
+            if(CONFIG.role) app.showLauncher();
+            else app.checkSetupStatus();
         } else if(expiry > 0) app.logout();
 
         if(!CONFIG.apiUrl) document.getElementById('connection-status')?.classList.remove('hidden');
@@ -206,14 +210,14 @@ const app = {
         if(weeklyBtn) {
             weeklyBtn.style.display = sysId === 'attendance' && CONFIG.role !== 'parent' ? 'flex' : 'none';
         }
-        // STRICT: Hide analytics and students tabs from parents
+        // Show analytics and students tabs for all roles (parents see filtered data)
         const analyticsNav = document.getElementById('nav-analytics');
         if(analyticsNav) {
-            analyticsNav.style.display = CONFIG.role === 'parent' ? 'none' : 'block';
+            analyticsNav.style.display = 'block';
         }
         const studentsNav = document.getElementById('nav-students');
         if(studentsNav) {
-            studentsNav.style.display = CONFIG.role === 'parent' ? 'none' : 'block';
+            studentsNav.style.display = 'block';
         }
 
         app.updateActionsMenu();
@@ -548,14 +552,14 @@ const app = {
             ctx.style.display = 'none';
             weeklyContainer.style.display = 'block';
             weeklyContainer.classList.add('relative');
-            // add fullscreen toggle button if not already present
-            if(!weeklyContainer.querySelector('.fullscreen-toggle')) {
-                const toggleBtn = document.createElement('button');
-                toggleBtn.className = 'fullscreen-toggle absolute top-2 right-2 px-2 py-1 bg-indigo-600 text-white text-xs rounded z-10';
-                toggleBtn.innerHTML = '<i class="fa-solid fa-expand"></i> Fullscreen';
-                toggleBtn.onclick = (e) => { e.stopPropagation(); app.toggleWeeklyFullscreen(); };
-                weeklyContainer.appendChild(toggleBtn);
-            }
+            // Always remove and re-add fullscreen toggle button
+            const oldBtn = weeklyContainer.querySelector('.fullscreen-toggle');
+            if(oldBtn) oldBtn.remove();
+            const toggleBtn = document.createElement('button');
+            toggleBtn.className = 'fullscreen-toggle absolute top-2 right-2 px-2 py-1 bg-indigo-600 text-white text-xs rounded z-10';
+            toggleBtn.innerHTML = '<i class="fa-solid fa-expand"></i> Fullscreen';
+            toggleBtn.onclick = (e) => { e.stopPropagation(); app.toggleWeeklyFullscreen(); };
+            weeklyContainer.appendChild(toggleBtn);
             app.renderWeeklyAttendance();
             return;
         } else {
@@ -904,11 +908,8 @@ const app = {
     },
     
     switchTab: (t) => {
-        // STRICT: Parents cannot access analytics or students tables
-        if(CONFIG.role === 'parent' && (t === 'analytics' || t === 'students')) {
-            Swal.fire('Access Denied', 'Parents can only view dashboard', 'info');
-            t = 'dashboard';
-        }
+        // Parents can view analytics and history for their child's data
+        // Data filtering in renderTable() and renderCharts() enforces child-only view
         
         // Hide all tabs
         document.querySelectorAll('.app-tab').forEach(el => el.classList.add('hidden'));
