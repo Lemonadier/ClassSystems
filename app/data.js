@@ -8,7 +8,11 @@ const dataModule = {
         state.isFetching = true;
         app.loading(true);
         try {
-            const url = `${CONFIG.apiUrl}?op=get_data&system=${CONFIG.activeSystem}`;
+            let url = `${CONFIG.apiUrl}?op=get_data&system=${CONFIG.activeSystem}`;
+            // FIX: Use secure endpoint for parents
+            if (CONFIG.role === 'parent' && CONFIG.user) {
+                 url = `${CONFIG.apiUrl}?op=get_student_data&system=${CONFIG.activeSystem}&studentId=${CONFIG.user['Student ID']}`;
+            }
             console.log('Fetching from:', url, 'System:', CONFIG.activeSystem);
             const res = await fetch(url);
             const data = await res.json();

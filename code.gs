@@ -106,6 +106,38 @@ function doGet(e) {
     }
     return response({ status: "success", setup_required: !isSetup });
   }
+
+  // FIX: Secure Data Fetching for Parents
+  if (op === "get_student_data") {
+    ensureSheet(ss, STUDENTS_SHEET);
+    ensureSheet(ss, TRANSACTIONS_SHEET);
+    ensureSheet(ss, HEALTH_SHEET);
+    ensureSheet(ss, ATTENDANCE_SHEET);
+    ensureSheet(ss, PROFILE_SHEET);
+
+    const studentId = e.parameter.studentId;
+    if (!studentId) return response({ status: "error", message: "Student ID required" });
+
+    // Fetch only the specific student
+    const allStudents = getData(ss, STUDENTS_SHEET) || [];
+    const student = allStudents.find(s => String(s["Student ID"]) === String(studentId));
+    
+    if (!student) return response({ status: "error", message: "Student not found" });
+
+    let sheetName = TRANSACTIONS_SHEET;
+    if (system === 'health') sheetName = HEALTH_SHEET;
+    else if (system === 'attendance') sheetName = ATTENDANCE_SHEET;
+    else if (system === 'profile') sheetName = PROFILE_SHEET;
+
+    const allTransactions = getData(ss, sheetName) || [];
+    const transactions = allTransactions.filter(t => String(t["Student ID"]) === String(studentId));
+
+    return response({ 
+      status: "success", 
+      students: [student], 
+      transactions: transactions
+    });
+  }
   
   return response({ status: "error", message: "Invalid GET operation" });
 }
