@@ -78,10 +78,26 @@ const app = {
         }
 
         const expiry = parseInt(localStorage.getItem('cb_session_expiry') || '0');
+        
+        // Check for magic link (parent auto-login)
+        const urlParams = new URLSearchParams(window.location.search);
+        if(urlParams.get('role') === 'parent' && urlParams.get('childId')) {
+            const childId = urlParams.get('childId');
+            const apiUrlEncoded = urlParams.get('apiUrl');
+            if(apiUrlEncoded) {
+                try {
+                    const decodedApi = atob(apiUrlEncoded);
+                    localStorage.setItem('cb_api_url', decodedApi);
+                    localStorage.setItem('cb_magic_child_id', childId);
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                } catch(e) { console.error('Invalid magic link', e); }
+            }
+        }
+        
         if (expiry > Date.now()) {
             CONFIG.role = localStorage.getItem('cb_session_role');
             if (CONFIG.role === 'parent') CONFIG.user = JSON.parse(localStorage.getItem('cb_session_user'));
-            const savedUrl = localStorage.getItem('cb_session_api_url');
+            const savedUrl = localStorage.getItem('cb_session_api_url') || localStorage.getItem('cb_api_url');
             if(savedUrl) CONFIG.apiUrl = savedUrl;
             app.showLauncher();
         } else if(expiry > 0) app.logout();
@@ -102,13 +118,22 @@ const app = {
         
         document.getElementById('search-input').oninput = (e) => app.renderTable(e.target.value);
 
-        // Autofill API URL input from saved settings (cb_api_url or session-specific)
-        const savedApi = localStorage.getItem('cb_api_url') || localStorage.getItem('cb_session_api_url');
+        // Autofill API URL input from saved settings (prefer teacher-saved, then session, then permanent)
+        const savedApi = localStorage.getItem('cb_teacher_api_key') || localStorage.getItem('cb_api_url') || localStorage.getItem('cb_session_api_url');
         if (savedApi) {
-            // persist session API to permanent storage if not already saved
             if(!localStorage.getItem('cb_api_url')) localStorage.setItem('cb_api_url', savedApi);
             const apiInput = document.getElementById('api-url');
             if(apiInput) apiInput.value = savedApi;
+        }
+        // If parent arrived via magic link, auto-fetch data
+        if(localStorage.getItem('cb_magic_child_id') && !CONFIG.role) {
+            const childId = localStorage.getItem('cb_magic_child_id');
+            document.getElementById('login-student-id').value = childId;
+            // auto-submit student login form
+            setTimeout(() => {
+                document.getElementById('form-login-student').dispatchEvent(new Event('submit'));
+                localStorage.removeItem('cb_magic_child_id');
+            }, 300);
         }
     },
 
@@ -175,10 +200,19 @@ const app = {
         document.getElementById('label-stat-1').textContent = sys.stat1;
         document.getElementById('label-stat-2').textContent = sys.stat2;
 
-        // Update chart buttons visibility (weekly only for attendance)
+        // Update chart buttons visibility (weekly only for attendance, not for parents)
         const weeklyBtn = document.getElementById('btn-chart-weekly-attendance');
         if(weeklyBtn) {
-            weeklyBtn.style.display = sysId === 'attendance' ? 'flex' : 'none';
+            weeklyBtn.style.display = sysId === 'attendance' && CONFIG.role !== 'parent' ? 'flex' : 'none';
+        }
+        // STRICT: Hide analytics and students tabs from parents
+        const analyticsNav = document.getElementById('nav-analytics');
+        if(analyticsNav) {
+            analyticsNav.style.display = CONFIG.role === 'parent' ? 'none' : 'block';
+        }
+        const studentsNav = document.getElementById('nav-students');
+        if(studentsNav) {
+            studentsNav.style.display = CONFIG.role === 'parent' ? 'none' : 'block';
         }
 
         app.updateActionsMenu();
@@ -514,7 +548,12 @@ const app = {
         
         // Get filter values
         const searchVal = document.getElementById('search-input')?.value?.toLowerCase() || '';
-        const src = state.tableMode === 'students' ? state.students : state.transactions;
+        // STRICT: Parents can ONLY see their own child's data
+        let src = state.tableMode === 'students' ? state.students : state.transactions;
+        if(CONFIG.role === 'parent') {
+            if(state.tableMode === 'students') src = state.students.filter(s => s['Student ID'] === CONFIG.user?.['Student ID']);
+            else src = state.transactions.filter(t => String(t['Student ID']) === String(CONFIG.user?.['Student ID']));
+        }
         const isHistory = state.tableMode === 'history';
         const sys = SYSTEMS[CONFIG.activeSystem];
 
@@ -580,6 +619,15 @@ const app = {
             if(window.myChart) window.myChart.destroy();
             ctx.style.display = 'none';
             weeklyContainer.style.display = 'block';
+            weeklyContainer.classList.add('relative');
+            // add fullscreen toggle button if not already present
+            if(!weeklyContainer.querySelector('.fullscreen-toggle')) {
+                const toggleBtn = document.createElement('button');
+                toggleBtn.className = 'fullscreen-toggle absolute top-2 right-2 px-2 py-1 bg-indigo-600 text-white text-xs rounded z-10';
+                toggleBtn.innerHTML = '<i class="fa-solid fa-expand"></i> Fullscreen';
+                toggleBtn.onclick = (e) => { e.stopPropagation(); app.toggleWeeklyFullscreen(); };
+                weeklyContainer.appendChild(toggleBtn);
+            }
             app.renderWeeklyAttendance();
             return;
         } else {
@@ -884,14 +932,15 @@ const app = {
              app.loading(false);
              if(d.status === 'success') { 
                  localStorage.setItem('cb_session_token', key);
-                 // persist the API URL permanently when teacher logs in
+                 // persist the API URL and key permanently when teacher logs in
                  const apiInputVal = document.getElementById('api-url')?.value?.trim();
                  if(apiInputVal) {
                      localStorage.setItem('cb_api_url', apiInputVal);
                      localStorage.setItem('cb_session_api_url', apiInputVal);
+                     localStorage.setItem('cb_teacher_api_key', apiInputVal);
                  } else {
-                     const existing = localStorage.getItem('cb_api_url') || localStorage.getItem('cb_session_api_url') || CONFIG.apiUrl || '';
-                     if(existing) { localStorage.setItem('cb_api_url', existing); localStorage.setItem('cb_session_api_url', existing); }
+                     const existing = localStorage.getItem('cb_api_url') || localStorage.getItem('cb_session_api_url') || localStorage.getItem('cb_teacher_api_key') || CONFIG.apiUrl || '';
+                     if(existing) { localStorage.setItem('cb_api_url', existing); localStorage.setItem('cb_session_api_url', existing); localStorage.setItem('cb_teacher_api_key', existing); }
                  }
                  localStorage.setItem('cb_session_expiry', Date.now() + CONFIG.sessionTimeout);
                  CONFIG.role = 'teacher';
@@ -915,8 +964,24 @@ const app = {
             } else Swal.fire('Not Found', 'Student ID not found', 'error');
         });
     },
+
+    generateParentMagicLink: () => {
+        if (!CONFIG.user || CONFIG.role !== 'parent') { Swal.fire('Error', 'Only parents can generate a magic link', 'error'); return; }
+        const childId = CONFIG.user['Student ID'];
+        const apiUrl = CONFIG.apiUrl || localStorage.getItem('cb_api_url') || '';
+        if (!apiUrl) { Swal.fire('Error', 'API URL not configured', 'error'); return; }
+        const link = `${window.location.protocol}//${window.location.host}${window.location.pathname}?role=parent&childId=${encodeURIComponent(childId)}&apiUrl=${btoa(apiUrl)}`;
+        navigator.clipboard.writeText(link);
+        Swal.fire('Success', 'Magic link copied to clipboard', 'success');
+    },
     
     switchTab: (t) => {
+        // STRICT: Parents cannot access analytics or students tables
+        if(CONFIG.role === 'parent' && (t === 'analytics' || t === 'students')) {
+            Swal.fire('Access Denied', 'Parents can only view dashboard', 'info');
+            t = 'dashboard';
+        }
+        
         // Hide all tabs
         document.querySelectorAll('.app-tab').forEach(el => el.classList.add('hidden'));
         
@@ -973,7 +1038,15 @@ const app = {
         CONFIG.apiUrl = url;
         Swal.fire('Success', 'API URL saved', 'success');
     },
-    copyShareLink: () => { const link = `${window.location.protocol}//${window.location.host}${window.location.pathname}?config=${btoa(CONFIG.apiUrl)}`; navigator.clipboard.writeText(link); Swal.fire('Copied', '', 'success'); },
+    copyShareLink: () => {
+        if (CONFIG.role === 'parent') {
+            app.generateParentMagicLink();
+        } else {
+            const link = `${window.location.protocol}//${window.location.host}${window.location.pathname}?config=${btoa(CONFIG.apiUrl)}`;
+            navigator.clipboard.writeText(link);
+            Swal.fire('Copied', '', 'success');
+        }
+    },
     handleAddStudent: async (e) => {
         e.preventDefault();
         await app.postData({ op: 'add_student', studentId: document.getElementById('new-id').value, name: document.getElementById('new-name').value, grade: document.getElementById('new-grade').value, no: document.getElementById('new-no').value }, 'Student Added');
@@ -1202,11 +1275,22 @@ window.openWeeklyFullscreen = () => {
     app.renderWeeklyAttendance();
     const content = document.getElementById('weekly-attendance-container')?.innerHTML || '';
     const target = document.getElementById('weekly-attendance-full');
-    if(target) target.innerHTML = content;
+    if(target) {
+        // remove any fullscreen buttons from the copy
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = content;
+        tempDiv.querySelector('.fullscreen-toggle')?.remove();
+        target.innerHTML = tempDiv.innerHTML;
+    }
     const modal = document.getElementById('modal-weekly');
     if(modal) {
         modal.classList.remove('hidden'); modal.classList.add('flex');
     }
+};
+
+window.toggleWeeklyFullscreen = () => {
+    // toggle between inline and fullscreen for attendance weekly
+    app.openWeeklyFullscreen();
 };
 
 window.closeModal = (n) => {
